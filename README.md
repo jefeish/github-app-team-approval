@@ -1,4 +1,4 @@
-# Team Approval Checker GitHub App
+# Team Approval App
 
 A Probot-based GitHub App that enforces team-based approval rules for pull requests, configurable via a YAML file in an admin repository. The app supports multiple teams, wildcard branch patterns, and provides a web admin UI for the approval rules.
 
