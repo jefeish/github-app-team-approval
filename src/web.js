@@ -205,7 +205,7 @@ export function registerApprovalRulesRoute(router, octokit) {
                       <th data-col="1">${branchIcon}Branch <span class="sort-indicator"></span></th>
                       <th data-col="2">${teamIcon}Team <span class="sort-indicator"></span></th>
                       <th data-col="3">${approvalsIcon}Required Approvals <span class="sort-indicator"></span></th>
-                      <th id="addRow">${addIcon}</th>
+                      <th id="addRow" title="Add">${addIcon}</th>
                     </tr>
                   </thead>
                   <tbody>
