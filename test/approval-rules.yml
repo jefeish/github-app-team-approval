@@ -1,0 +1,25 @@
+repos:
+  - repo_name: jefeish-1
+    branch: main
+    team: team-x
+    required_approvals: 2
+
+  - repo_name: jefeish-1
+    branch: main
+    team: dev-team
+    required_approvals: 1
+
+  - repo_name: repo-two
+    branch: release/*
+    team: release-team
+    required_approvals: 3
+
+  - repo_name: repo-two
+    branch: hotfix/*
+    team: ops-team
+    required_approvals: 2
+
+  - repo_name: repo-three
+    branch: staging
+    team: qa-team
+    required_approvals: 1

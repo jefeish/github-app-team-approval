@@ -13,9 +13,11 @@
   ],
   "scripts": {
     "start": "probot run ./src/index.js",
+    "dev": "nodemon --exec probot run ./src/index.js",
     "test": "node --test"
   },
   "dependencies": {
+    "@primer/octicons": "^19.15.2",
     "probot": "^13.0.1"
   },
   "devDependencies": {
