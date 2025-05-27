@@ -91,7 +91,7 @@ repos:
 | 4  | ❌              | ✅                  | ✅                 | ❌                   | yes            | Repo matches wildcard (`*`), branch exact                                               |
 | 5  | ❌              | ✅                  | ❌                 | ✅                   | yes            | Repo matches wildcard (hotfix/*), branch matches wildcard                               |
 | 6  | ❌              | ✅                  | ❌                 | ❌                   | no             | Repo matches wildcard, branch does not match any rule                                   |
-| 7  | ❌              | ❌                  | ✅                 | ❌                   | yes            | No repo match, but branch matches a wildcard rule (`*`)                                 |
+| 7  | ❌              | ❌                  | ✅                 | ❌                   | no            | No repo match, but branch matches a wildcard rule (`*`)                                 |
 | 8  | ❌              | ❌                  | ❌                 | ✅                   | no            | No repo match, branch matches wildcard rule (`*`)                                       |
 | 9  | ❌              | ❌                  | ❌                 | ❌                   | no             | No repo or branch match                                                                 |
 | 10 | *              | *                   | *                  | *                    | yes            | If rule uses `*` for repo and/or branch, it matches everything                          |
