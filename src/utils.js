@@ -50,7 +50,7 @@ export function checkApprovalStatus(requiredApprovals, actualApprovals) {
  * @returns {Promise<Array>} Array of review objects.
  */
 export async function getPullRequestReviews(github, owner, repo_name, prNumber) {
-    console.log(`Fetching reviews for PR #${prNumber}\n\n\n\n`);
+    console.log(`Fetching reviews for PR #${prNumber}`);
     // Fetch all reviews for the pull request
     const { data } = await github.rest.pulls.listReviews({
         owner: owner,

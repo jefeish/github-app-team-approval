@@ -81,6 +81,36 @@ repos:
 
 ---
 
+## Scenarios
+
+| #  | Repo-Exact-Match | Repo-Wildcard-Match | Branch-Exact-Match | Branch-Wildcard-Match | Matching Rule? | Notes                                                                                   |
+|----|:---------------:|:-------------------:|:------------------:|:--------------------:|:--------------:|-----------------------------------------------------------------------------------------|
+| 1  | ✔️              | ❌                  | ✔️                 | ❌                   | yes            | Exact repo and branch match                                                             |
+| 2  | ✔️              | ❌                  | ❌                 | ✔️                   | yes            | Exact repo, branch matches wildcard (e.g. hotfix/*)                                     |
+| 3  | ✔️              | ❌                  | ❌                 | ❌                   | no             | Exact repo, branch does not match any rule                                              |
+| 4  | ❌              | ✔️                  | ✔️                 | ❌                   | yes            | Repo matches wildcard (`*`), branch exact                                               |
+| 5  | ❌              | ✔️                  | ❌                 | ✔️                   | yes            | Repo matches wildcard (hotfix/*), branch matches wildcard                               |
+| 6  | ❌              | ✔️                  | ❌                 | ❌                   | no             | Repo matches wildcard, branch does not match any rule                                   |
+| 7  | ❌              | ❌                  | ✔️                 | ❌                   | yes            | No repo match, but branch matches a wildcard rule (`*`)                                 |
+| 8  | ❌              | ❌                  | ❌                 | ✔️                   | no            | No repo match, branch matches wildcard rule (`*`)                                       |
+| 9  | ❌              | ❌                  | ❌                 | ❌                   | no             | No repo or branch match                                                                 |
+| 10 | *              | *                   | *                  | *                    | yes            | If rule uses `*` for repo and/or branch, it matches everything                          |
+
+**Legend:**  
+- ✔️ = True (match for that column)  
+- ❌ = False  
+- * = "Don't care" (wildcard rule, matches everything)
+
+**Matching Rule?**  
+- ✔️ if any rule matches (including `*` wildcard for repo or branch)
+- ❌ if no rule matches
+
+**Notes:**  
+- If a rule uses `*` for repo or branch, it matches all repos or branches respectively.
+- If no matching rule is found, the app marks the check as success and comments that no rules apply.
+
+---
+
 ## Running Locally
 
 1. Clone the repo and install dependencies:

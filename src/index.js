@@ -30,8 +30,6 @@ export default (app, { getRouter }) => {
 
     const { pull_request, organization } = context.payload;
 
-    // app.log.info(`Pull request review event payload: ${JSON.stringify(context.payload)}`);
-
     if (!pull_request) {
       app.log.info('No pull request found in event payload.');
       return;
@@ -48,39 +46,68 @@ export default (app, { getRouter }) => {
     const approval_rules_yaml = await readFileFromAdminRepo(context.octokit, owner, repo, path, ref)
     app.log.debug(`Read file content: ${approval_rules_yaml}`);
 
-    // Parse the YAML content to get the team name and required approvals for the PR Repo
     try {
       const approvalRules = yaml.load(approval_rules_yaml);
-      // Find the rule that matches the repo and branch
       const repoName = pull_request.base.repo.name;
       const branchName = pull_request.base.ref;
 
       // Fetch all reviews for the pull request
-      const reviews = await getPullRequestReviews(context.octokit, pull_request.base.repo.owner.login, pull_request.base.repo.name, pull_request.number);
+      const reviews = await getPullRequestReviews(
+        context.octokit,
+        pull_request.base.repo.owner.login,
+        pull_request.base.repo.name,
+        pull_request.number
+      );
       app.log.info(`Fetched ${reviews.length} reviews for PR #${pull_request.number}`);
 
       // Find all rules that match the repo and branch (supporting wildcards)
       function branchMatches(pattern, branch) {
+        if (pattern === '*') return true;
         if (pattern.endsWith('/*')) {
           return branch.startsWith(pattern.slice(0, -2));
         }
         return pattern === branch;
       }
 
+      function repoMatches(pattern, repo) {
+        if (pattern === '*') return true;
+        if (pattern.endsWith('/*')) {
+          return repo.startsWith(pattern.slice(0, -2));
+        }
+        return pattern === repo;
+      }
+
       const matchingRules = approvalRules.repos.filter(
-        r => r.repo_name === repoName && branchMatches(r.branch, branchName)
+        r => repoMatches(r.repo_name, repoName) && branchMatches(r.branch, branchName)
       );
 
-      // iterate through each matching rule and check approvals
       if (matchingRules.length === 0) {
         app.log.info(`No matching approval rules found for repo ${repoName} branch ${branchName}.`);
+
+        // Set a successful check run if no rules match
+        const checkParams = {
+          owner: pull_request.base.repo.owner.login,
+          repo: pull_request.base.repo.name,
+          name: 'team-approval',
+          head_sha: pull_request.head.sha,
+          status: 'completed',
+          conclusion: 'success',
+          output: {
+            title: 'No team approval rules apply',
+            summary: 'No matching team approval rules were found for this repository and branch. Marking as passed.',
+          },
+        };
+        await context.octokit.checks.create(checkParams);
+
         return;
       }
 
-      // Process each matching rule
       app.log.info(`Processing ${matchingRules.length} matching approval rules for repo ${repoName} branch ${branchName}`);
       app.log.debug(`Matching rules: ${JSON.stringify(matchingRules)}`);
-      // Iterate through each matching rule
+
+      let allRulesPassed = true;
+      let failedMessages = [];
+
       for (const rule of matchingRules) {
         const teamName = rule.team;
         const requiredApprovals = rule.required_approvals;
@@ -96,12 +123,34 @@ export default (app, { getRouter }) => {
 
         if (approvalCount >= requiredApprovals) {
           app.log.info(`Success: ${approvalCount} approvals from team ${teamName} met the requirement.`);
-          // Optionally, set a status or comment on the PR here
         } else {
           app.log.info(`Failed: Only ${approvalCount} approvals from team ${teamName} received.`);
-          // Optionally, set a status or comment on the PR here
+          allRulesPassed = false;
+          failedMessages.push(
+            `Team **${teamName}**: required ${requiredApprovals}, got ${approvalCount}`
+          );
         }
       }
+
+      // Set a check run on the PR
+      const checkParams = {
+        owner: pull_request.base.repo.owner.login,
+        repo: pull_request.base.repo.name,
+        name: 'team-approval',
+        head_sha: pull_request.head.sha,
+        status: 'completed',
+        conclusion: allRulesPassed ? 'success' : 'failure',
+        output: {
+          title: allRulesPassed
+            ? 'Team approval requirements met'
+            : 'Team approval requirements not met',
+          summary: allRulesPassed
+            ? 'All required team approvals have been received.'
+            : `Some team approval requirements are missing:\n${failedMessages.join('\n')}`,
+        },
+      };
+      await context.octokit.checks.create(checkParams);
+
     } catch (err) {
       app.log.error(`Failed to parse approval rules YAML: ${err.message}`);
     }
