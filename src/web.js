@@ -10,24 +10,78 @@ import { readFileFromAdminRepo } from './utils.js';
  */
 export function registerApprovalRulesRoute(router, octokit) {
 
-    router.post('/approval-rules', async (req, res) => {
-      try {
-        const { repos } = req.body;
-        const yamlStr = yaml.dump({ repos });
+  router.post('/approval-rules', async (req, res) => {
+    console.log('Received request to update approval rules.');
+    try {
+      const { repos } = req.body;
+      const yamlStr = yaml.dump({ repos });
+      const owner = process.env.ADMIN_REPO_ORG;
+      const repo = process.env.ADMIN_REPO_NAME;
+      const path = process.env.ADMIN_REPO_PATH;
+      const baseBranch = process.env.ADMIN_REPO_REF || 'main';
+      const create_pr = process.env.ADMIN_REPO_CREATE_PR || FALSE;
+
+      if (create_pr) {
+        // --- Create new branch and PR ---
+        // 1. Get latest commit SHA of base branch
+        const { data: baseRefData } = await octokit.git.getRef({
+          owner,
+          repo,
+          ref: `heads/${baseBranch}`,
+        });
+        const baseSha = baseRefData.object.sha;
   
-        const owner = process.env.ADMIN_REPO_ORG;
-        const repo = process.env.ADMIN_REPO_NAME;
-        const path = process.env.ADMIN_REPO_PATH;
-        const branch = process.env.ADMIN_REPO_REF || 'main';
+        // 2. Create a unique branch name
+        const branchName = `approval-rules-update-${Date.now()}`;
   
+        // 3. Create the new branch
+        await octokit.git.createRef({
+          owner,
+          repo,
+          ref: `refs/heads/${branchName}`,
+          sha: baseSha,
+        });
+  
+        // 4. Get the current file SHA from the new branch
+        const { data: fileData } = await octokit.repos.getContent({
+          owner,
+          repo,
+          path,
+          ref: branchName,
+        });
+        const fileSha = fileData.sha;
+  
+        // 5. Commit the new YAML content to the new branch
+        await octokit.repos.createOrUpdateFileContents({
+          owner,
+          repo,
+          path,
+          message: 'Update approval rules via web UI',
+          content: Buffer.from(yamlStr, 'utf8').toString('base64'),
+          sha: fileSha,
+          branch: branchName,
+        });
+  
+        // 6. Create a pull request
+        const { data: pr } = await octokit.pulls.create({
+          owner,
+          repo,
+          title: 'Update approval rules via web UI',
+          head: branchName,
+          base: baseBranch,
+          body: 'This PR updates the approval rules table from the web UI.',
+        });
+  
+        res.status(200).json({ pr_url: pr.html_url, message: 'Pull request created!' });
+      } else {
+        // --- Direct commit to main branch ---
         // Get the current file SHA (required for updating)
         const { data: fileData } = await octokit.repos.getContent({
           owner,
           repo,
           path,
-          ref: branch,
+          ref: baseBranch,
         });
-  
         const sha = fileData.sha;
   
         // Commit the new YAML content
@@ -38,14 +92,15 @@ export function registerApprovalRulesRoute(router, octokit) {
           message: 'Update approval rules via web UI',
           content: Buffer.from(yamlStr, 'utf8').toString('base64'),
           sha,
-          branch,
+          branch: baseBranch,
         });
   
         res.status(200).send('Saved');
-      } catch (err) {
-        res.status(500).send(`Error saving approval rules: ${err.message}`);
       }
-    });
+    } catch (err) {
+      res.status(500).send(`Error saving approval rules: ${err.message}`);
+    }
+  });
 
   router.get('/approval-rules', async (req, res) => {
     try {
@@ -162,6 +217,7 @@ export function registerApprovalRulesRoute(router, octokit) {
               </div>
             </div>
             <script>
+
               // Table search
               document.getElementById('searchInput').addEventListener('input', function() {
                 const filter = this.value.toLowerCase();
@@ -173,7 +229,7 @@ export function registerApprovalRulesRoute(router, octokit) {
               });
 
               // Simple table sort
-              document.querySelectorAll('.custom-thead th').forEach(th => {
+              document.querySelectorAll('.custom-thead th[data-col]').forEach(th => {
                 th.addEventListener('click', function() {
                   const table = document.getElementById('approval-table');
                   const tbody = table.tBodies[0];
@@ -183,7 +239,7 @@ export function registerApprovalRulesRoute(router, octokit) {
                   const currentIndicator = this.querySelector('.sort-indicator');
                   const ascending = !this.classList.contains('sorted-asc');
                   // Remove sort indicators from all headers
-                  document.querySelectorAll('.custom-thead th').forEach(th2 => {
+                  document.querySelectorAll('.custom-thead th[data-col]').forEach(th2 => {
                     th2.classList.remove('sorted-asc', 'sorted-desc');
                     th2.querySelector('.sort-indicator').textContent = '';
                   });
@@ -222,6 +278,14 @@ export function registerApprovalRulesRoute(router, octokit) {
                 tbody.appendChild(newRow);
               });
               
+              // Remove row when delete icon is clicked
+              document.querySelector('#approval-table').addEventListener('click', function(event) {
+                if (event.target.closest('.delete-row')) {
+                  const row = event.target.closest('tr');
+                  if (row) row.remove();
+                }
+              });
+
               // save table data to server
               document.getElementById('saveTable').addEventListener('click', function() {
                 const rows = document.querySelectorAll('#approval-table tbody tr');
@@ -235,20 +299,98 @@ export function registerApprovalRulesRoute(router, octokit) {
                     required_approvals: parseInt(cells[3].textContent.trim(), 10)
                   });
                 });
-                fetch('/approval-rules', {
+                fetch('/app/approval-rules', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ repos })
-                }).then(res => {
-                  if (res.ok) alert('Saved!');
-                  else {
-                    alert('Save failed: '+ res);
+                }).then(async res => {
+                  const data = await res.json().catch(() => ({}));
+                  if (res.ok) {
+                    if (data.pr_url) {
+                      // Set the link and show the modal
+                      document.getElementById('prLink').textContent = data.pr_url;
+                      document.getElementById('prLink').href = data.pr_url;
+                      const prModal = new bootstrap.Modal(document.getElementById('prModal'));
+                      prModal.show();
+                    } else {
+                      alert(data.message || 'Saved');
+                    }
+                  } else {
+                    alert('Save failed: ' + (data.message || res.statusText));
                   }
                 });
               });
 
+              // Inline edit row
+              document.querySelector('#approval-table').addEventListener('click', function(event) {
+                const editIcon = '${editIcon}';
+                const deleteIcon = '${deleteIcon}';
+              
+                const editBtn = event.target.closest('.edit-row');
+                if (!editBtn) return;
+              
+                const row = editBtn.closest('tr');
+                if (!row) return;
+              
+                // Prevent multiple edits at once
+                if (row.classList.contains('editing')) return;
+                row.classList.add('editing');
+              
+                const cells = row.querySelectorAll('td');
+                const original = Array.from(cells).map(td => td.innerHTML);
+              
+                // Only edit the first 4 columns (repo, branch, team, approvals)
+                for (let i = 0; i < 4; i++) {
+                  const value = cells[i].textContent.trim();
+                  cells[i].innerHTML = '<input type="text" class="form-control form-control-sm" value="' + value + '">';
+                }
+              
+                // Replace action cell with Done/Cancel
+                cells[4].innerHTML = 
+                  '<button class="btn btn-sm btn-success done-edit" title="Done">Done</button>' +
+                  '<button class="btn btn-sm btn-secondary cancel-edit ms-2" title="Cancel">Cancel</button>';
+              
+                // Done handler
+                cells[4].querySelector('.done-edit').onclick = function() {
+                  for (let i = 0; i < 4; i++) {
+                    const input = cells[i].querySelector('input');
+                    cells[i].textContent = input.value;
+                  }
+                  cells[4].innerHTML =
+                    '<span class="edit-row" style="cursor:pointer;" title="Edit">' + editIcon + '</span>' +
+                    '<span class="delete-row ms-2" style="cursor:pointer;" title="Delete">' + deleteIcon + '</span>';
+                  row.classList.remove('editing');
+                };
+              
+                // Cancel handler
+                cells[4].querySelector('.cancel-edit').onclick = function() {
+                  for (let i = 0; i < 5; i++) {
+                    cells[i].innerHTML = original[i];
+                  }
+                  row.classList.remove('editing');
+                };
+              });
+
             </script>
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+            <!-- Modal -->
+            <div class="modal fade" id="prModal" tabindex="-1" aria-labelledby="prModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-light">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="prModalLabel">Pull Request Created</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <a id="prLink" href="#" target="_blank" class="link-info"></a>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </body>
         </html>
       `;

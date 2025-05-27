@@ -16,6 +16,7 @@ import * as express from "express";
 export default (app, { getRouter }) => {
   // Get an express router to expose new HTTP endpoints
   const router = getRouter("/app");
+  router.use(express.json()); // <-- Add this line
   // Register the web route
   // registerApprovalRulesRoute(router);
   const installation_id = 67771903

@@ -75,7 +75,7 @@ repos:
 
 ## Admin UI Screenshot
 
-![Admin UI Screenshot](docs/images/admin-screen.png)
+![Admin UI Screenshot](docs/images/admin-screen-edit.png)
 
 *Above: The web admin page for managing repository approval rules.*
 
