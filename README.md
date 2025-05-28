@@ -117,7 +117,7 @@ repos:
    ```sh
    npm install
    ```
->**Note:** If the App is already installed, you can proceed to add the custom environment variables, otherwise follow the Probot App instructions on http://localhost:3000 first, before you create a `.env` file or add any variables.
+>**Note:** If the App is already installed, you can proceed to add the custom environment variables, otherwise follow the Probot App instructions on http://localhost:3000/probot first, before you create a `.env` file or add any variables.
 
 2. Set environment variables in `.env`:
    ```
