@@ -130,7 +130,13 @@ repos:
    npm start
    ```
 
-4. Access the admin UI at `http://localhost:3000/app/approval-rules`
+   or
+
+   ```sh
+   npm run dev
+   ```
+
+5. Access the admin UI at `http://localhost:3000/app/approval-rules`
 
 ---
 
